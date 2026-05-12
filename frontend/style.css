@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 @theme {
+  --color-turquoise-50:  #f0fdfa;
+  --color-turquoise-100: #ccfbf1;
   --color-turquoise-500: #0d9488;
   --color-turquoise-600: #0f766e;
+  --color-turquoise-800: #115e59;
   --color-orange-500: #f97316;
   --color-orange-600: #ea580c;
 }
@@ -22,9 +25,10 @@ body {
 .chat-message {
   padding: 0.5rem 1rem;
   border-radius: 1rem;
-  margin-bottom: 0.5rem;
-  max-width: 85%;
+  margin-bottom: 0.25rem;
+  max-width: 88%;
   word-wrap: break-word;
+  line-height: 1.5;
 }
 
 .chat-user {
@@ -40,3 +44,18 @@ body {
   align-self: flex-start;
   border-bottom-left-radius: 0.25rem;
 }
+
+/* Toast slide-in animation */
+@keyframes toast-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* Stock bar transition */
+.stock-bar { transition: width 0.4s ease; }
+
+/* Spinner keyframe (used by Phosphor spin class) */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.animate-spin { animation: spin 1s linear infinite; }

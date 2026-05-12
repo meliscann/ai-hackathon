@@ -5,23 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>KOBİ Pilot - Operasyon Asistanı</title>
     <link rel="stylesheet" href="./style.css">
-    
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Leaflet CSS for Map -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <!-- Phosphor Icons -->
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
   </head>
   <body class="bg-gray-50 flex text-slate-800">
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
 
     <!-- Sidebar -->
     <aside class="w-64 shrink-0 bg-slate-900 text-slate-300 flex flex-col sticky top-0 h-screen transition-all duration-300 z-40" id="sidebar">
@@ -39,11 +32,14 @@
         <a href="#" onclick="switchView('inventory')" id="nav-inventory" class="nav-link flex items-center px-3 py-2.5 hover:bg-slate-800 hover:text-white rounded-lg group transition-colors">
           <i class="ph ph-archive text-xl mr-3"></i> Stok Yönetimi
         </a>
+        <a href="#" onclick="switchView('customers')" id="nav-customers" class="nav-link flex items-center px-3 py-2.5 hover:bg-slate-800 hover:text-white rounded-lg group transition-colors">
+          <i class="ph ph-users text-xl mr-3"></i> Müşteriler
+        </a>
       </nav>
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 flex flex-col min-h-screen">
+    <main class="flex-1 flex flex-col min-h-screen overflow-x-hidden">
       <!-- Topbar -->
       <header class="h-16 bg-white/90 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-8 sticky top-0 z-20 transition-all">
         <div class="flex items-center gap-4">
@@ -52,8 +48,17 @@
           </button>
           <h1 class="text-xl font-semibold text-slate-800" id="topbar-title">Genel Bakış</h1>
         </div>
-        <div class="flex items-center gap-4">
-          <button class="p-2 text-slate-400 hover:text-slate-600"><i class="ph ph-bell text-xl"></i></button>
+        <div class="flex items-center gap-3">
+          <!-- Excel Rapor İndir -->
+          <a href="http://localhost:8000/report/excel" id="btn-excel"
+             class="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors">
+            <i class="ph ph-file-xls text-lg"></i> Rapor İndir
+          </a>
+          <!-- WebSocket durumu -->
+          <span id="ws-badge" class="flex items-center gap-1 text-xs text-slate-400 px-2 py-1 bg-slate-100 rounded-full">
+            <span class="w-2 h-2 rounded-full bg-slate-400" id="ws-dot"></span>
+            <span id="ws-label">Bağlanıyor</span>
+          </span>
           <div class="h-8 w-8 rounded-full bg-turquoise-500 text-white flex items-center justify-center font-bold">M</div>
         </div>
       </header>
@@ -95,7 +100,6 @@
 
         <!-- AI Forecast & Map Row -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <!-- AI Forecast -->
           <div class="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 shadow-md text-white flex flex-col justify-between">
             <div>
               <div class="flex items-center justify-between mb-4">
@@ -141,8 +145,29 @@
       </div>
 
       <!-- ORDERS VIEW -->
-      <div id="view-orders" class="page-view p-8 space-y-8 max-w-7xl mx-auto w-full hidden">
-        <h2 class="text-2xl font-bold text-slate-800 mb-6">Sipariş Yönetimi</h2>
+      <div id="view-orders" class="page-view p-8 space-y-6 max-w-7xl mx-auto w-full hidden">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-bold text-slate-800">Sipariş Yönetimi</h2>
+        </div>
+
+        <!-- Arama & Filtre -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3 items-center">
+          <div class="relative flex-1 min-w-[200px]">
+            <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" id="order-search" placeholder="Müşteri adı veya ürün ara..."
+              class="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-turquoise-500 bg-slate-50">
+          </div>
+          <select id="order-status-filter" class="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-turquoise-500">
+            <option value="">Tüm Durumlar</option>
+            <option value="beklemede">Beklemede</option>
+            <option value="hazırlanıyor">Hazırlanıyor</option>
+            <option value="kargoda">Kargoda</option>
+            <option value="teslim edildi">Teslim Edildi</option>
+            <option value="iptal">İptal</option>
+          </select>
+          <span id="order-count-label" class="text-sm text-slate-400 ml-auto"></span>
+        </div>
+
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-600">
@@ -153,23 +178,30 @@
                   <th class="px-6 py-4 font-medium">Ürün</th>
                   <th class="px-6 py-4 font-medium">Tutar</th>
                   <th class="px-6 py-4 font-medium">Durum</th>
+                  <th class="px-6 py-4 font-medium text-right">Güncelle</th>
                 </tr>
               </thead>
-              <tbody id="orders-tbody" class="divide-y divide-gray-100">
-                <!-- Data injected via JS -->
-              </tbody>
+              <tbody id="orders-tbody" class="divide-y divide-gray-100"></tbody>
             </table>
           </div>
         </div>
       </div>
 
       <!-- INVENTORY VIEW -->
-      <div id="view-inventory" class="page-view p-8 space-y-8 max-w-7xl mx-auto w-full hidden">
-        <h2 class="text-2xl font-bold text-slate-800 mb-6">Stok Yönetimi</h2>
-        
+      <div id="view-inventory" class="page-view p-8 space-y-6 max-w-7xl mx-auto w-full hidden">
+        <div class="flex items-center justify-between">
+          <h2 class="text-2xl font-bold text-slate-800">Stok Yönetimi</h2>
+          <button onclick="openAddProductModal()"
+            class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-turquoise-500 hover:bg-turquoise-600 rounded-lg transition-colors shadow-sm">
+            <i class="ph ph-plus"></i> Ürün Ekle
+          </button>
+        </div>
+
+        <!-- Tüm Ürünler -->
         <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div class="p-6 border-b border-gray-100 flex justify-between items-center bg-slate-50/50">
-            <h3 class="font-semibold text-lg">Kritik Stok Uyarıları</h3>
+          <div class="p-4 border-b border-gray-100 bg-slate-50/50 flex items-center justify-between">
+            <h3 class="font-semibold">Tüm Ürünler</h3>
+            <span id="inventory-total-label" class="text-sm text-slate-400"></span>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-600">
@@ -178,13 +210,63 @@
                   <th class="px-6 py-4 font-medium">Ürün</th>
                   <th class="px-6 py-4 font-medium">Kategori</th>
                   <th class="px-6 py-4 font-medium">Mevcut Stok</th>
+                  <th class="px-6 py-4 font-medium">Fiyat</th>
                   <th class="px-6 py-4 font-medium">Durum</th>
-                  <th class="px-6 py-4 font-medium text-right">Aksiyon</th>
+                  <th class="px-6 py-4 font-medium text-right">İşlem</th>
                 </tr>
               </thead>
-              <tbody id="inventory-tbody" class="divide-y divide-gray-100">
-                <!-- Data injected via JS -->
-              </tbody>
+              <tbody id="inventory-tbody" class="divide-y divide-gray-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- CUSTOMERS VIEW -->
+      <div id="view-customers" class="page-view p-8 space-y-6 max-w-7xl mx-auto w-full hidden">
+        <h2 class="text-2xl font-bold text-slate-800">Müşteri Segmentasyonu</h2>
+
+        <!-- Segment özet kartları -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div class="bg-amber-50 p-3 rounded-lg text-amber-500"><i class="ph ph-crown text-2xl"></i></div>
+            <div>
+              <p class="text-sm text-slate-500 font-medium">VIP Müşteri</p>
+              <h3 class="text-2xl font-bold" id="seg-vip">-</h3>
+              <p class="text-xs text-slate-400">≥ ₺500 harcama</p>
+            </div>
+          </div>
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div class="bg-turquoise-50 p-3 rounded-lg text-turquoise-500"><i class="ph ph-heart text-2xl"></i></div>
+            <div>
+              <p class="text-sm text-slate-500 font-medium">Sadık Müşteri</p>
+              <h3 class="text-2xl font-bold" id="seg-loyal">-</h3>
+              <p class="text-xs text-slate-400">≥ 3 sipariş</p>
+            </div>
+          </div>
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4">
+            <div class="bg-blue-50 p-3 rounded-lg text-blue-500"><i class="ph ph-user-plus text-2xl"></i></div>
+            <div>
+              <p class="text-sm text-slate-500 font-medium">Yeni Müşteri</p>
+              <h3 class="text-2xl font-bold" id="seg-new">-</h3>
+              <p class="text-xs text-slate-400">İlk alışveriş</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-600">
+              <thead class="bg-slate-50 text-slate-500 border-b border-gray-200">
+                <tr>
+                  <th class="px-6 py-4 font-medium">Müşteri</th>
+                  <th class="px-6 py-4 font-medium">Telefon</th>
+                  <th class="px-6 py-4 font-medium">Sipariş</th>
+                  <th class="px-6 py-4 font-medium">Toplam Harcama</th>
+                  <th class="px-6 py-4 font-medium">Son Sipariş</th>
+                  <th class="px-6 py-4 font-medium">Segment</th>
+                </tr>
+              </thead>
+              <tbody id="customers-tbody" class="divide-y divide-gray-100"></tbody>
             </table>
           </div>
         </div>
@@ -203,16 +285,13 @@
           <p class="text-xs text-slate-500">Gemini AI Destekli</p>
         </div>
       </div>
-      
-      <div id="chat-messages" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-slate-50/50">
-        <div class="chat-message chat-assistant text-sm bg-white border border-gray-100 shadow-sm">
-          Merhaba! Ben KOBİ Pilot Asistanınız. Günlük özetleri sorabilir, siparişleri kontrol edebilir veya kritik stokları listeleyebilirsiniz. Size nasıl yardımcı olabilirim?
-        </div>
-      </div>
+
+      <div id="chat-messages" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-slate-50/50"></div>
 
       <div class="p-4 border-t border-gray-200 bg-white">
         <form id="chat-form" class="flex gap-2" onsubmit="handleChatSubmit(event)">
-          <input type="text" id="chat-input" placeholder="Asistana yazın..." class="flex-1 bg-slate-50 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500 focus:bg-white transition-colors" required>
+          <input type="text" id="chat-input" placeholder="Asistana yazın..."
+            class="flex-1 bg-slate-50 border border-gray-200 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500 focus:bg-white transition-colors" required>
           <button type="submit" class="bg-turquoise-500 text-white p-2 px-3 rounded-lg hover:bg-turquoise-600 transition-colors shadow-sm">
             <i class="ph ph-paper-plane-right"></i>
           </button>
@@ -225,7 +304,7 @@
       <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden transform scale-95 transition-transform duration-300" id="email-modal-content">
         <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-slate-50">
           <h3 class="font-semibold text-slate-800 flex items-center"><i class="ph ph-envelope-simple mr-2 text-turquoise-500"></i> Tedarikçi E-postası (AI Taslağı)</h3>
-          <button onclick="closeModal()" class="text-slate-400 hover:text-slate-700"><i class="ph ph-x text-lg"></i></button>
+          <button onclick="closeModal('email-modal')" class="text-slate-400 hover:text-slate-700"><i class="ph ph-x text-lg"></i></button>
         </div>
         <div class="p-6">
           <div id="email-loading" class="text-center py-8">
@@ -235,11 +314,85 @@
           <textarea id="email-textarea" class="w-full h-48 p-4 border border-gray-200 rounded-lg text-sm hidden focus:outline-none focus:ring-2 focus:ring-turquoise-500" readonly></textarea>
         </div>
         <div class="p-4 border-t border-gray-200 bg-slate-50 flex justify-end gap-3">
-          <button onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">İptal</button>
+          <button onclick="closeModal('email-modal')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">İptal</button>
           <button onclick="copyEmail()" id="btn-copy" class="px-4 py-2 text-sm font-medium text-white bg-turquoise-500 hover:bg-turquoise-600 rounded-lg transition-colors hidden flex items-center">
             <i class="ph ph-copy mr-2"></i> Kopyala
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Ürün Ekle Modal -->
+    <div id="product-modal" class="fixed inset-0 bg-slate-900/50 hidden flex justify-center items-center z-50 opacity-0 transition-opacity">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform scale-95 transition-transform duration-300" id="product-modal-content">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-slate-50">
+          <h3 class="font-semibold text-slate-800 flex items-center"><i class="ph ph-plus-circle mr-2 text-turquoise-500"></i> <span id="product-modal-title">Yeni Ürün Ekle</span></h3>
+          <button onclick="closeModal('product-modal')" class="text-slate-400 hover:text-slate-700"><i class="ph ph-x text-lg"></i></button>
+        </div>
+        <form id="product-form" onsubmit="handleProductSubmit(event)" class="p-6 space-y-4">
+          <input type="hidden" id="product-edit-id" value="">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-slate-500 mb-1">Ürün Adı</label>
+              <input id="p-name" type="text" required placeholder="Örn: Organik Domates"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Kategori</label>
+              <input id="p-category" type="text" required placeholder="Sebze"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Birim</label>
+              <input id="p-unit" type="text" required placeholder="kg / adet / şişe"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Fiyat (TL)</label>
+              <input id="p-price" type="number" step="0.01" min="0" required placeholder="0.00"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-slate-500 mb-1">Mevcut Stok</label>
+              <input id="p-stock" type="number" min="0" required placeholder="0"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500">
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-slate-500 mb-1">Minimum Stok (Kritik Eşik)</label>
+              <input id="p-min-stock" type="number" min="0" required placeholder="0"
+                class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500">
+            </div>
+          </div>
+          <div class="flex justify-end gap-3 pt-2">
+            <button type="button" onclick="closeModal('product-modal')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">İptal</button>
+            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-turquoise-500 hover:bg-turquoise-600 rounded-lg transition-colors">
+              <span id="product-submit-label">Ürün Ekle</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Stok Güncelle Modal -->
+    <div id="stock-modal" class="fixed inset-0 bg-slate-900/50 hidden flex justify-center items-center z-50 opacity-0 transition-opacity">
+      <div class="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden transform scale-95 transition-transform duration-300" id="stock-modal-content">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center bg-slate-50">
+          <h3 class="font-semibold text-slate-800 flex items-center"><i class="ph ph-stack mr-2 text-turquoise-500"></i> Stok Güncelle</h3>
+          <button onclick="closeModal('stock-modal')" class="text-slate-400 hover:text-slate-700"><i class="ph ph-x text-lg"></i></button>
+        </div>
+        <form id="stock-form" onsubmit="handleStockSubmit(event)" class="p-6 space-y-4">
+          <input type="hidden" id="stock-product-id" value="">
+          <p class="text-sm text-slate-600">Ürün: <span id="stock-product-name" class="font-semibold"></span></p>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Yeni Stok Miktarı</label>
+            <input id="stock-amount" type="number" min="0" required placeholder="0"
+              class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-turquoise-500">
+          </div>
+          <div class="flex justify-end gap-3">
+            <button type="button" onclick="closeModal('stock-modal')" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">İptal</button>
+            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-turquoise-500 hover:bg-turquoise-600 rounded-lg transition-colors">Güncelle</button>
+          </div>
+        </form>
       </div>
     </div>
 
