@@ -268,6 +268,23 @@ async def add_product(product: ProductCreate):
     return {"id": new_id, **product.model_dump()}
 
 
+@app.delete("/products/{product_id}", status_code=204)
+async def delete_product(product_id: int):
+    conn = sqlite3.connect("kobi_pilot.db")
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM orders WHERE product_id=?", (product_id,))
+    if c.fetchone()[0] > 0:
+        conn.close()
+        raise HTTPException(400, "Bu ürüne ait siparişler bulunduğundan silinemez")
+    c.execute("DELETE FROM products WHERE id=?", (product_id,))
+    if c.rowcount == 0:
+        conn.close()
+        raise HTTPException(404, "Ürün bulunamadı")
+    conn.commit()
+    conn.close()
+    await manager.broadcast({"type": "product_deleted", "message": "Ürün silindi"})
+
+
 @app.patch("/products/{product_id}/stock")
 async def update_stock(product_id: int, body: StockUpdate):
     if body.stock < 0:

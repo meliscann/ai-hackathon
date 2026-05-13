@@ -61,6 +61,9 @@ function handleWsMessage(msg) {
     showToast(msg.message, "success");
     fetchInventory();
     fetchDashboard();
+  } else if (msg.type === "product_deleted") {
+    fetchInventory();
+    fetchDashboard();
   }
 }
 
@@ -239,6 +242,10 @@ function renderInventory(products) {
           class="text-xs bg-white border border-gray-200 shadow-sm hover:bg-slate-50 text-slate-600 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center">
           <i class="ph ph-envelope-simple text-turquoise-500 mr-1.5"></i> E-posta
         </button>` : ""}
+        <button onclick="deleteProduct(${item.id}, '${item.name.replace(/'/g, "\\'")}')"
+          class="text-xs bg-white border border-gray-200 shadow-sm hover:bg-red-50 text-slate-600 px-3 py-1.5 rounded-lg transition-colors inline-flex items-center">
+          <i class="ph ph-trash text-red-500 mr-1.5"></i> Sil
+        </button>
       </td>`;
     tbody.appendChild(tr);
   });
@@ -619,6 +626,24 @@ window.handleProductSubmit = async function (e) {
     await fetchDashboard();
   } catch {
     showToast("Ürün eklenemedi", "error");
+  }
+};
+
+// ── Ürün Sil ─────────────────────────────────────────────────────────────────
+window.deleteProduct = async function (productId, productName) {
+  if (!confirm(`"${productName}" ürününü silmek istediğinizden emin misiniz?`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/products/${productId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const err = await res.json();
+      showToast(err.detail || "Ürün silinemedi", "error");
+      return;
+    }
+    showToast(`"${productName}" silindi`, "success");
+    await fetchInventory();
+    await fetchDashboard();
+  } catch {
+    showToast("Ürün silinemedi", "error");
   }
 };
 
